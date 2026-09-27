@@ -17,6 +17,109 @@ Two worked examples live in [`public/samples/`](../public/samples):
 
 Copy whichever is closer to what you're transcribing and edit it.
 
+## Test library (`contents/`)
+
+Tests placed in the `contents/` folder appear on the home page automatically — no file picking.
+Each folder is one test, and each sub-folder one section of it:
+
+```
+contents/
+  cambridge-18-test-1/
+    test.json                 optional — { "title": "…", "description": "…" }
+    listening/
+      questions.json
+      answers.json
+      part1.mp3               referenced as "url": "part1.mp3"
+    reading/
+      questions.json
+      answers.json
+    writing/
+      questions.json          see "Writing" below
+      task1.png               referenced as "src": "task1.png"
+    speaking/
+      questions.json          see "Speaking" below
+```
+
+- Listening and Reading need both `questions.json` and `answers.json`, in the format below.
+  Writing and Speaking are not auto-marked, so they only need `questions.json`.
+- A relative audio `url` or image `src` resolves against the section folder, so recordings and
+  figures can sit beside the questions. Absolute URLs work as before.
+- Without `test.json`, the title is taken from the folder name.
+- Folders starting with `.` or `_` are ignored — handy for drafts.
+
+Under `npm run dev` new folders show up on refresh; the deployed site picks them up at build time.
+
+### Writing (`writing/questions.json`)
+
+```jsonc
+{
+  "formatVersion": 1,
+  "type": "writing",
+  "title": "Cambridge IELTS 21 — Test 1 Writing",
+  "durationSeconds": 3600,                 // one clock for both tasks
+  "instructions": "…",                     // optional — Options → Test Instructions
+  "tasks": [
+    {
+      "task": 1,
+      "minutes": 20,                         // "You should spend about 20 minutes on this task."
+      "minWords": 150,                       // "Write at least 150 words."
+      "prompt": [                            // the boxed text, one entry per paragraph
+        "The graph below gives information about …",
+        "Summarise the information by selecting and reporting the main features, …"
+      ],
+      "image": { "src": "task1.png", "alt": "Line graph: …" }   // optional
+    },
+    {
+      "task": 2,
+      "minutes": 40,
+      "minWords": 250,
+      "lead": "Write about the following topic:",              // optional, above the box
+      "prompt": ["…", "To what extent do you agree or disagree with this statement?"],
+      "after": ["Give reasons for your answer and include any relevant examples …"]  // optional
+    }
+  ]
+}
+```
+
+The screen follows the computer-delivered test: the task on the left, the answer box on the right
+with a live word count, spell check off, and Part 1 / Part 2 tabs at the bottom. Answers are
+reviewed (and can be downloaded) afterwards against the four marking criteria; there is no band
+score, because Writing is examiner-marked.
+
+### Speaking (`speaking/questions.json`)
+
+```jsonc
+{
+  "formatVersion": 1,
+  "type": "speaking",
+  "title": "Cambridge IELTS 21 — Test 1 Speaking",
+  "part1": {
+    "topics": [
+      { "title": "Hairstyles", "questions": ["Where do you go to get a haircut?", "…"] }
+    ]
+  },
+  "part2": {
+    "topic": "Describe a time when you used information for tourists, …",
+    "points": ["where you got this information", "…"],    // "You should say:"
+    "closing": "and explain whether this information was very helpful for you.",
+    "prepSeconds": 60,                                    // optional, default 60
+    "speakSeconds": 120,                                  // optional, default 120
+    "followUp": ["…"]                                     // optional rounding-off questions
+  },
+  "part3": {
+    "topics": [
+      { "title": "Tourist attractions", "questions": ["…"] }
+    ]
+  }
+}
+```
+
+The real Speaking test is face to face, so the app plays the examiner: questions are read aloud
+with the browser's speech voice (it can be switched off) and each answer is recorded from the
+microphone. Part 2 shows the cue card with a preparation countdown and a notes box, then records
+the long turn and stops it when time is up. Recordings stay in the browser tab and can be played
+back or downloaded on the results page.
+
 ---
 
 ## Questions file

@@ -56,6 +56,8 @@ export function formatClock(totalSeconds: number): string {
 /** Long form for announcements and the results page. */
 export function formatDuration(totalSeconds: number): string {
   const m = Math.round(totalSeconds / 60);
+  if (m < 1) return "under a minute";
+  if (m === 1) return "1 minute";
   if (m < 60) return `${m} minutes`;
   const h = Math.floor(m / 60);
   const rest = m % 60;

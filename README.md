@@ -172,18 +172,27 @@ Static Next.js App Router pages, entirely client-rendered. No server, no databas
 beyond fetching the audio URLs you supply.
 
 ```
-app/                    Routes: home, setup/[type], test, results
+app/                    Routes: home, setup/[type], tests/[test]/[section], test, results,
+                        writing, speaking
 components/
   questions/            One component per group type, plus the {{n}} body renderer
   test/                 Timer, nav bar, options menu, audio runner, passage, notes, split pane
   setup/                Upload, validation display, audio preflight
   results/              Score, per-part breakdown, answer review
+  writing/              Writing setup, task/answer screen, review
+  speaking/             Speaking setup and mic check, examiner-led screen, recordings review
 lib/
   schema.ts             Zod schemas — the single source of truth for the file format
   scoring.ts            Answer normalisation and marking
   bandTables.ts         Official raw-score → band conversion
   words.ts              Passage tokeniser and the annotation model
   store.ts              Zustand session state
+  contents.ts           Scans contents/ for the built-in test library
+  writingStore.ts       Writing session (essays, word counts)
+  speakingStore.ts      Speaking session (in-memory recordings)
+  speakingScript.ts     Turns a speaking file into the examiner's step-by-step script
+  speech.ts             Examiner voice (speech synthesis) and answer recording
+contents/               Ready-made tests: contents/<test>/<section>/questions.json (+ answers.json)
 ```
 
 Three decisions worth calling out:
