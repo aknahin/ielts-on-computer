@@ -12,7 +12,9 @@ import path from "node:path";
  *     listening/questions.json
  *     listening/answers.json
  *     listening/part1.mp3    audio referenced by a relative "url"
- *     writing/  speaking/    recognised, not yet playable
+ *     writing/questions.json
+ *     writing/task1.png      a Task 1 figure referenced by a relative "src"
+ *     speaking/questions.json
  *
  * Everything here runs on the server — at build time for the deployed site,
  * per request under `next dev` — so dropping a folder in is all it takes.
@@ -23,18 +25,25 @@ export const CONTENTS_DIR = path.join(process.cwd(), "contents");
 export const SECTIONS = ["listening", "reading", "writing", "speaking"] as const;
 export type Section = (typeof SECTIONS)[number];
 
-/** Sections the test player can run today. */
-export const PLAYABLE = ["listening", "reading"] as const;
-export type PlayableSection = (typeof PLAYABLE)[number];
+/** Listening and Reading are marked against a key; Writing and Speaking are not. */
+export const SCORED = ["listening", "reading"] as const;
+export type ScoredSection = (typeof SCORED)[number];
 
-export function isPlayable(section: string): section is PlayableSection {
-  return (PLAYABLE as readonly string[]).includes(section);
+export function isSection(section: string): section is Section {
+  return (SECTIONS as readonly string[]).includes(section);
+}
+
+export function isScored(section: string): section is ScoredSection {
+  return (SCORED as readonly string[]).includes(section);
+}
+
+function requiredFiles(section: Section): string[] {
+  return isScored(section) ? ["questions.json", "answers.json"] : ["questions.json"];
 }
 
 export type LibrarySection = {
   section: Section;
-  playable: boolean;
-  /** False when a playable section is missing its questions or answers file. */
+  /** False when the section folder is missing a required file. */
   complete: boolean;
 };
 
@@ -122,12 +131,11 @@ export async function listTests(): Promise<LibraryTest[]> {
     for (const section of SECTIONS) {
       if (!found.has(section)) continue;
       const dir = path.join(CONTENTS_DIR, slug, section);
-      const playable = isPlayable(section);
-      const complete =
-        playable &&
-        (await exists(path.join(dir, "questions.json"))) &&
-        (await exists(path.join(dir, "answers.json")));
-      sections.push({ section, playable, complete });
+      let complete = true;
+      for (const file of requiredFiles(section)) {
+        if (!(await exists(path.join(dir, file)))) complete = false;
+      }
+      sections.push({ section, complete });
     }
     if (sections.length === 0) continue;
 
@@ -162,7 +170,7 @@ export type SectionFiles = {
  */
 export async function readSection(
   slug: string,
-  section: PlayableSection,
+  section: ScoredSection,
 ): Promise<SectionFiles | null> {
   if (!isSafeSegment(slug)) return null;
   const dir = path.join(CONTENTS_DIR, slug, section);
@@ -180,11 +188,31 @@ export async function readSection(
 
   return {
     questions: {
-      text: resolveAudio(questions, `/contents/${slug}/${section}/`),
+      text: resolveMedia(questions, `/contents/${slug}/${section}/`),
       filename: `${slug}/${section}/questions.json`,
     },
     answers: { text: answers, filename: `${slug}/${section}/answers.json` },
   };
+}
+
+/**
+ * Reads a Writing or Speaking `questions.json` as text. There is no answer
+ * key; relative image paths are rewritten like audio URLs.
+ */
+export async function readTaskSection(
+  slug: string,
+  section: "writing" | "speaking",
+): Promise<{ text: string; filename: string } | null> {
+  if (!isSafeSegment(slug)) return null;
+  try {
+    const text = await fs.readFile(path.join(CONTENTS_DIR, slug, section, "questions.json"), "utf8");
+    return {
+      text: resolveMedia(text, `/contents/${slug}/${section}/`),
+      filename: `${slug}/${section}/questions.json`,
+    };
+  } catch {
+    return null;
+  }
 }
 
 /** Absolute URLs, root-relative paths and data/blob URIs are left alone. */
@@ -192,21 +220,34 @@ function isRelativeUrl(url: string): boolean {
   return !/^([a-z][a-z\d+.-]*:|\/)/i.test(url);
 }
 
-function resolveAudio(text: string, base: string): string {
+/** Points relative `audio[].url` and `tasks[].image.src` at the section folder. */
+function resolveMedia(text: string, base: string): string {
   let json: unknown;
   try {
     json = JSON.parse(text);
   } catch {
     return text; // left for the setup page to report
   }
-  const audio = (json as { audio?: unknown })?.audio;
-  if (!Array.isArray(audio)) return text;
+  const root = json as { audio?: unknown; tasks?: unknown };
+  const resolve = (url: string) =>
+    base + url.replace(/^\.\//, "").split("/").map(encodeURIComponent).join("/");
 
   let changed = false;
-  for (const entry of audio) {
-    if (entry && typeof entry.url === "string" && isRelativeUrl(entry.url)) {
-      entry.url = base + entry.url.replace(/^\.\//, "").split("/").map(encodeURIComponent).join("/");
-      changed = true;
+  if (Array.isArray(root?.audio)) {
+    for (const entry of root.audio) {
+      if (entry && typeof entry.url === "string" && isRelativeUrl(entry.url)) {
+        entry.url = resolve(entry.url);
+        changed = true;
+      }
+    }
+  }
+  if (Array.isArray(root?.tasks)) {
+    for (const task of root.tasks) {
+      const image = task?.image;
+      if (image && typeof image.src === "string" && isRelativeUrl(image.src)) {
+        image.src = resolve(image.src);
+        changed = true;
+      }
     }
   }
   return changed ? JSON.stringify(json, null, 2) : text;

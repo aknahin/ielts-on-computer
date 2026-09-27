@@ -429,3 +429,89 @@ export function placeholdersIn(body: Body): number[] {
   }
   return found;
 }
+
+/* ---------------------------------------------------------------------------
+ * Writing and Speaking.
+ *
+ * Neither is auto-marked, so each is a single `questions.json` with no answer
+ * key. See docs/FORMAT.md.
+ * ------------------------------------------------------------------------- */
+
+export const WritingTaskSchema = z.object({
+  task: z.number().int().min(1).max(2),
+  /** "You should spend about N minutes on this task." */
+  minutes: z.number().int().min(1).max(120),
+  /** "Write at least N words." */
+  minWords: z.number().int().min(1).max(1000),
+  /** A line above the boxed prompt, e.g. "Write about the following topic:". */
+  lead: z.string().optional(),
+  /** The boxed prompt, one entry per paragraph. */
+  prompt: z.array(z.string().min(1)).min(1),
+  /** Lines below the box, e.g. "Give reasons for your answer…". */
+  after: z.array(z.string()).optional(),
+  /** Task 1 chart, plan or diagram. A relative `src` resolves next to the file. */
+  image: z.object({ src: z.string().min(1), alt: z.string().min(1) }).optional(),
+});
+export type WritingTask = z.infer<typeof WritingTaskSchema>;
+
+export const WritingTestSchema = z.object({
+  formatVersion: z.literal(1),
+  type: z.literal("writing"),
+  title: z.string().min(1),
+  /** Academic Writing is 3600 (60 minutes) for both tasks together. */
+  durationSeconds: z.number().int().min(10).max(14400),
+  instructions: z.string().optional(),
+  tasks: z.array(WritingTaskSchema).min(1).max(2),
+});
+export type WritingTest = z.infer<typeof WritingTestSchema>;
+
+const SpeakingTopicSchema = z.object({
+  title: z.string().min(1),
+  questions: z.array(z.string().min(1)).min(1),
+});
+export type SpeakingTopic = z.infer<typeof SpeakingTopicSchema>;
+
+export const SpeakingTestSchema = z.object({
+  formatVersion: z.literal(1),
+  type: z.literal("speaking"),
+  title: z.string().min(1),
+  instructions: z.string().optional(),
+  /** Introduction and interview: short questions on familiar topics. */
+  part1: z.object({ topics: z.array(SpeakingTopicSchema).min(1) }),
+  /** The long turn, from a cue card. */
+  part2: z.object({
+    /** "Describe a time when…" */
+    topic: z.string().min(1),
+    /** The "You should say:" bullet points. */
+    points: z.array(z.string().min(1)).min(1),
+    /** "and explain…" */
+    closing: z.string().optional(),
+    prepSeconds: z.number().int().min(0).max(300).default(60),
+    speakSeconds: z.number().int().min(10).max(600).default(120),
+    /** Optional one or two questions the examiner asks after the long turn. */
+    followUp: z.array(z.string().min(1)).optional(),
+  }),
+  /** Two-way discussion on themes linked to Part 2. */
+  part3: z.object({ topics: z.array(SpeakingTopicSchema).min(1) }),
+});
+export type SpeakingTest = z.infer<typeof SpeakingTestSchema>;
+
+export function parseWritingTest(raw: unknown): ParseResult<WritingTest> {
+  const parsed = parseWith(WritingTestSchema, raw);
+  if (!parsed.ok) return parsed;
+  const numbers = parsed.value.tasks.map((t) => t.task);
+  if (new Set(numbers).size !== numbers.length) {
+    return { ok: false, issues: [{ level: "error", message: "tasks: task numbers must be unique." }] };
+  }
+  return parsed;
+}
+
+export function parseSpeakingTest(raw: unknown): ParseResult<SpeakingTest> {
+  return parseWith(SpeakingTestSchema, raw);
+}
+
+/** Words as the IELTS computer test counts them: anything between spaces. */
+export function countWords(text: string): number {
+  const trimmed = text.trim();
+  return trimmed === "" ? 0 : trimmed.split(/\s+/).length;
+}

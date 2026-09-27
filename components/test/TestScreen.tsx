@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { NO_RESPONSES, useTestStore } from "@/lib/store";
-import { useCountdown, formatClock } from "@/lib/useTimer";
+import { useCountdown } from "@/lib/useTimer";
 import { useFullscreen } from "@/lib/useFullscreen";
 import { answeredSet, navEntries } from "@/lib/progress";
 import { GroupView } from "@/components/questions/GroupView";
@@ -11,12 +11,9 @@ import { AudioRunner, VolumeControl } from "./AudioRunner";
 import { Modal } from "./Modal";
 import { NavBar } from "./NavBar";
 import { NotesButton, NotesPanel } from "./NotesPanel";
-import { OptionsMenu } from "./OptionsMenu";
 import { Passage } from "./Passage";
 import { SplitPane } from "./SplitPane";
-
-/** Seconds remaining at which the header changes colour (video 4:26). */
-const WARNING_AT = 60;
+import { FullscreenBanner, TestHeader } from "./TestHeader";
 
 export function TestScreen() {
   const router = useRouter();
@@ -26,7 +23,7 @@ export function TestScreen() {
   const submit = useTestStore((s) => s.submit);
   const setActivePart = useTestStore((s) => s.setActivePart);
 
-  const { isFullscreen, supported, enter } = useFullscreen();
+  const { enter } = useFullscreen();
 
   const [showInstructions, setShowInstructions] = useState(false);
   const [confirmSubmit, setConfirmSubmit] = useState(false);
@@ -80,7 +77,6 @@ export function TestScreen() {
 
   const activePart =
     test.parts.find((p) => p.part === session.activePart) ?? test.parts[0];
-  const warning = remaining <= WARNING_AT;
 
   const questionsPane = (
     <div ref={questionsRef} className="h-full overflow-y-auto px-6 py-5">
@@ -98,50 +94,18 @@ export function TestScreen() {
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden">
-      {/* The whole top band changes colour in the last minute. */}
-      <header
-        className="flex shrink-0 items-center gap-4 border-b border-[var(--border-strong)] px-4 py-2.5 transition-colors"
-        style={{
-          background: warning ? "var(--warn-bg)" : "var(--bg-panel)",
-          color: warning ? "var(--warn-fg)" : "inherit",
-        }}
+      <TestHeader
+        title={test.title}
+        remaining={remaining}
+        onShowInstructions={() => setShowInstructions(true)}
+        onSubmit={() => setConfirmSubmit(true)}
       >
-        <h1 className="min-w-0 truncate text-sm font-semibold">{test.title}</h1>
+        {test.type === "reading" && (
+          <NotesButton onClick={() => setOpenNote(openNote ?? firstNoteId())} />
+        )}
+      </TestHeader>
 
-        <div className="ml-auto flex items-center gap-3">
-          <div
-            role="timer"
-            aria-live={warning ? "assertive" : "off"}
-            className="tabular-nums"
-            title="Time remaining"
-          >
-            <span className="text-xs uppercase tracking-wide">
-              {warning ? "1 minute left" : "Time remaining"}
-            </span>{" "}
-            <span className="text-lg font-bold">{formatClock(remaining)}</span>
-          </div>
-
-          {test.type === "reading" && <NotesButton onClick={() => setOpenNote(openNote ?? firstNoteId())} />}
-
-          <OptionsMenu
-            onShowInstructions={() => setShowInstructions(true)}
-            onSubmit={() => setConfirmSubmit(true)}
-          />
-        </div>
-      </header>
-
-      {supported && !isFullscreen && (
-        <div className="flex shrink-0 items-center justify-between gap-4 border-b border-[var(--border)] bg-[var(--warn-bg)] px-4 py-2 text-sm text-[var(--warn-fg)]">
-          <span>You have left fullscreen. The timer is still running.</span>
-          <button
-            type="button"
-            onClick={() => void enter()}
-            className="rounded border border-current px-3 py-1 font-semibold"
-          >
-            Return to fullscreen
-          </button>
-        </div>
-      )}
+      <FullscreenBanner />
 
       {test.type === "reading" && activePart.passage ? (
         <div className="flex min-h-0 flex-1">

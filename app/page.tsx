@@ -96,7 +96,7 @@ function LibraryCard({ test }: { test: LibraryTest }) {
       <div className="mt-4 flex flex-wrap gap-2">
         {test.sections.map((s) => {
           const label = SECTION_LABEL[s.section];
-          if (s.playable && s.complete) {
+          if (s.complete) {
             return (
               <Link
                 key={s.section}
@@ -110,14 +110,10 @@ function LibraryCard({ test }: { test: LibraryTest }) {
           return (
             <span
               key={s.section}
-              title={
-                s.playable
-                  ? "This section needs both questions.json and answers.json."
-                  : "This section type is not supported yet."
-              }
+              title="This section is missing its questions.json (and answers.json for Listening and Reading)."
               className="cursor-not-allowed rounded border border-[var(--border)] px-4 py-2 text-sm font-medium text-[var(--muted)]"
             >
-              {label} · {s.playable ? "files missing" : "coming soon"}
+              {label} · files missing
             </span>
           );
         })}
