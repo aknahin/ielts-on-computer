@@ -184,6 +184,8 @@ lib/
   bandTables.ts         Official raw-score → band conversion
   words.ts              Passage tokeniser and the annotation model
   store.ts              Zustand session state
+  contents.ts           Scans contents/ for the built-in test library
+contents/               Ready-made tests: contents/<test>/<section>/{questions,answers}.json
 ```
 
 Three decisions worth calling out:

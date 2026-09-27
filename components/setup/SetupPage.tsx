@@ -28,14 +28,44 @@ type Slot<T> = {
 
 const EMPTY = { filename: null, value: null, issues: [] };
 
+function readQuestions(text: string, filename: string): Slot<Test> {
+  const json = parseJson(text);
+  if (!json.ok) return { filename, value: null, issues: json.issues };
+  const parsed = parseTest(json.value);
+  if (!parsed.ok) return { filename, value: null, issues: parsed.issues };
+  const issues = validateTestInternals(parsed.value);
+  const fatal = issues.some((i) => i.level === "error");
+  return { filename, value: fatal ? null : parsed.value, issues };
+}
+
+function readAnswers(text: string, filename: string): Slot<AnswerKey> {
+  const json = parseJson(text);
+  if (!json.ok) return { filename, value: null, issues: json.issues };
+  const parsed = parseAnswerKey(json.value);
+  return {
+    filename,
+    value: parsed.ok ? parsed.value : null,
+    issues: parsed.ok ? [] : parsed.issues,
+  };
+}
+
 type AudioProbe = { part: number; url: string; state: "pending" | "ok" | "failed" };
 
-export function SetupPage({ type }: { type: TestType }) {
+/** A test from the `contents/` library, loaded without any file picking. */
+export type SetupPreset = { testTitle: string; files: SampleFiles };
+
+export function SetupPage({ type, preset }: { type: TestType; preset?: SetupPreset }) {
   const router = useRouter();
   const start = useTestStore((s) => s.start);
 
-  const [questions, setQuestions] = useState<Slot<Test>>(EMPTY);
-  const [answers, setAnswers] = useState<Slot<AnswerKey>>(EMPTY);
+  // Library tests arrive with their files already read on the server; they go
+  // through the same validation as a drop, so a broken file still shows why.
+  const [questions, setQuestions] = useState<Slot<Test>>(() =>
+    preset ? readQuestions(preset.files.questions.text, preset.files.questions.filename) : EMPTY,
+  );
+  const [answers, setAnswers] = useState<Slot<AnswerKey>>(() =>
+    preset ? readAnswers(preset.files.answers.text, preset.files.answers.filename) : EMPTY,
+  );
   const [probeState, setProbeState] = useState<Record<string, "ok" | "failed">>({});
   const [starting, setStarting] = useState(false);
 
@@ -50,37 +80,14 @@ export function SetupPage({ type }: { type: TestType }) {
   const wrongType = test !== null && test.type !== type;
 
   const handleQuestions = useCallback(
-    (text: string, filename: string) => {
-      const json = parseJson(text);
-      if (!json.ok) {
-        setQuestions({ filename, value: null, issues: json.issues });
-        return;
-      }
-      const parsed = parseTest(json.value);
-      if (!parsed.ok) {
-        setQuestions({ filename, value: null, issues: parsed.issues });
-        return;
-      }
-      const issues = validateTestInternals(parsed.value);
-      const fatal = issues.some((i) => i.level === "error");
-      setQuestions({ filename, value: fatal ? null : parsed.value, issues });
-    },
+    (text: string, filename: string) => setQuestions(readQuestions(text, filename)),
     [],
   );
 
-  const handleAnswers = useCallback((text: string, filename: string) => {
-    const json = parseJson(text);
-    if (!json.ok) {
-      setAnswers({ filename, value: null, issues: json.issues });
-      return;
-    }
-    const parsed = parseAnswerKey(json.value);
-    setAnswers({
-      filename,
-      value: parsed.ok ? parsed.value : null,
-      issues: parsed.ok ? [] : parsed.issues,
-    });
-  }, []);
+  const handleAnswers = useCallback(
+    (text: string, filename: string) => setAnswers(readAnswers(text, filename)),
+    [],
+  );
 
   /** Fills both slots from the bundled demo, as if the files had been dropped. */
   const loadSample = useCallback(
@@ -172,30 +179,45 @@ export function SetupPage({ type }: { type: TestType }) {
       <Link href="/" className="text-sm text-[var(--muted)] underline">
         ← Back
       </Link>
-      <h1 className="mt-3 text-2xl font-bold">Load a {label} test</h1>
-      <p className="mt-1 text-sm text-[var(--muted)]">
-        Both files are validated before the test can start. Nothing is uploaded anywhere — the
-        files are read in your browser.
-      </p>
+      {preset ? (
+        <>
+          <h1 className="mt-3 text-2xl font-bold">
+            {preset.testTitle} — {label}
+          </h1>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Loaded from the test library. Check the details below, then start when you are ready.
+          </p>
+        </>
+      ) : (
+        <>
+          <h1 className="mt-3 text-2xl font-bold">Load a {label} test</h1>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Both files are validated before the test can start. Nothing is uploaded anywhere — the
+            files are read in your browser.
+          </p>
+        </>
+      )}
 
-      <div className="mt-8 grid gap-4">
-        <FileDrop
-          label="Questions file"
-          hint={`e.g. samples/demo-${type}.questions.json`}
-          filename={questions.filename}
-          status={questions.filename === null ? "empty" : questions.value ? "ok" : "error"}
-          onText={handleQuestions}
-        />
-        <FileDrop
-          label="Answers file"
-          hint={`e.g. samples/demo-${type}.answers.json`}
-          filename={answers.filename}
-          status={answers.filename === null ? "empty" : answers.value ? "ok" : "error"}
-          onText={handleAnswers}
-        />
-      </div>
+      {!preset && (
+        <div className="mt-8 grid gap-4">
+          <FileDrop
+            label="Questions file"
+            hint={`e.g. samples/demo-${type}.questions.json`}
+            filename={questions.filename}
+            status={questions.filename === null ? "empty" : questions.value ? "ok" : "error"}
+            onText={handleQuestions}
+          />
+          <FileDrop
+            label="Answers file"
+            hint={`e.g. samples/demo-${type}.answers.json`}
+            filename={answers.filename}
+            status={answers.filename === null ? "empty" : answers.value ? "ok" : "error"}
+            onText={handleAnswers}
+          />
+        </div>
+      )}
 
-      {questions.filename === null && <SampleTests type={type} onLoad={loadSample} />}
+      {!preset && questions.filename === null && <SampleTests type={type} onLoad={loadSample} />}
 
       {wrongType && (
         <IssueList

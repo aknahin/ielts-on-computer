@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { listTests, type LibrarySection, type LibraryTest } from "@/lib/contents";
 
 const CARDS = [
   {
@@ -17,7 +18,16 @@ const CARDS = [
   },
 ] as const;
 
-export default function Home() {
+const SECTION_LABEL: Record<LibrarySection["section"], string> = {
+  listening: "Listening",
+  reading: "Reading",
+  writing: "Writing",
+  speaking: "Speaking",
+};
+
+export default async function Home() {
+  const library = await listTests();
+
   return (
     <main className="mx-auto flex min-h-dvh max-w-4xl flex-col justify-center px-6 py-16">
       <header className="mb-10">
@@ -27,6 +37,24 @@ export default function Home() {
           and answer files, then sit it under exam conditions.
         </p>
       </header>
+
+      {library.length > 0 && (
+        <section className="mb-12">
+          <h2 className="text-lg font-semibold">Test library</h2>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Ready-made tests from the <code>contents/</code> folder. Pick a section to begin.
+          </p>
+          <ul className="mt-4 grid gap-4">
+            {library.map((test) => (
+              <LibraryCard key={test.slug} test={test} />
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {library.length > 0 && (
+        <h2 className="mb-4 text-lg font-semibold">Or bring your own files</h2>
+      )}
 
       <div className="grid gap-5 sm:grid-cols-2">
         {CARDS.map((card) => (
@@ -55,5 +83,45 @@ export default function Home() {
         two complete Cambridge tests you can use as templates.
       </p>
     </main>
+  );
+}
+
+function LibraryCard({ test }: { test: LibraryTest }) {
+  return (
+    <li className="rounded-lg border border-[var(--border)] bg-[var(--bg-panel)] p-5">
+      <h3 className="text-base font-semibold">{test.title}</h3>
+      {test.description && (
+        <p className="mt-1 text-sm leading-relaxed text-[var(--muted)]">{test.description}</p>
+      )}
+      <div className="mt-4 flex flex-wrap gap-2">
+        {test.sections.map((s) => {
+          const label = SECTION_LABEL[s.section];
+          if (s.playable && s.complete) {
+            return (
+              <Link
+                key={s.section}
+                href={`/tests/${test.slug}/${s.section}`}
+                className="rounded bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-[var(--accent-fg)]"
+              >
+                {label} →
+              </Link>
+            );
+          }
+          return (
+            <span
+              key={s.section}
+              title={
+                s.playable
+                  ? "This section needs both questions.json and answers.json."
+                  : "This section type is not supported yet."
+              }
+              className="cursor-not-allowed rounded border border-[var(--border)] px-4 py-2 text-sm font-medium text-[var(--muted)]"
+            >
+              {label} · {s.playable ? "files missing" : "coming soon"}
+            </span>
+          );
+        })}
+      </div>
+    </li>
   );
 }

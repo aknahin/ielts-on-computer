@@ -17,6 +17,34 @@ Two worked examples live in [`public/samples/`](../public/samples):
 
 Copy whichever is closer to what you're transcribing and edit it.
 
+## Test library (`contents/`)
+
+Tests placed in the `contents/` folder appear on the home page automatically — no file picking.
+Each folder is one test, and each sub-folder one section of it:
+
+```
+contents/
+  cambridge-18-test-1/
+    test.json                 optional — { "title": "…", "description": "…" }
+    listening/
+      questions.json
+      answers.json
+      part1.mp3               referenced as "url": "part1.mp3"
+    reading/
+      questions.json
+      answers.json
+    writing/                  shown as "coming soon" for now
+    speaking/                 shown as "coming soon" for now
+```
+
+- A section is playable once it has both `questions.json` and `answers.json`, in the format below.
+- A relative audio `url` resolves against the section folder, so recordings can sit beside the
+  questions. Absolute URLs work as before.
+- Without `test.json`, the title is taken from the folder name.
+- Folders starting with `.` or `_` are ignored — handy for drafts.
+
+Under `npm run dev` new folders show up on refresh; the deployed site picks them up at build time.
+
 ---
 
 ## Questions file
